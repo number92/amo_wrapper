@@ -8,7 +8,7 @@ log_format = "%(levelname)s : %(asctime)s - %(module)s/%(funcName)s - %(message)
 current_date = datetime.datetime.now().strftime("%Y-%m-%d")
 
 
-def get_logger(module):
+def get_logger(module, level=logging.INFO):
     formatter = logging.Formatter(log_format)  # "%(asctime)s %(levelname)s %(message)s"
     handler = logging.StreamHandler()
     handler.setFormatter(formatter)
@@ -17,7 +17,7 @@ def get_logger(module):
     file_handler.setFormatter(formatter)
 
     custom_logger = logging.getLogger(module)
-    custom_logger.setLevel(logging.DEBUG)
+    custom_logger.setLevel(level)
 
     custom_logger.addHandler(handler)
     custom_logger.addHandler(file_handler)

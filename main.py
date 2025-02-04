@@ -7,11 +7,13 @@ amoclient = AMOClient(AMO_PREFIX, AMO_LONG_TOKEN)
 
 
 async def main():
-    result = await amoclient.get_leads()
-    pprint.pprint(result["_page"])
-    pprint.pprint(result["_links"])
+    # leads = await amoclient.get_leads()
+    # pipelines = await amoclient.get_pipelines()
+    contacts = await amoclient.get_contacts()
+    # pprint.pprint(leads["_page"])
+    # pprint.pprint(leads["_links"])
 
-    pprint.pprint(result["_embedded"]["leads"][-1])
+    pprint.pprint(contacts["_embedded"]["leads"][-1])
 
 
 if __name__ == "__main__":
