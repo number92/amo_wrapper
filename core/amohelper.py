@@ -1,3 +1,4 @@
+import asyncio
 import http
 import json
 import os
@@ -5,12 +6,19 @@ import re
 import traceback
 from aiohttp import ClientSession
 from datetime import datetime, timezone
+
+from core.schemes.base import PaginatedResponse
+from core.schemes.leads import Lead, LeadResponse
+from core.schemes.pipelines import Pipeline, PipelinesResponse
+
 from .logger import get_logger
-from typing import Dict, List, Any, Iterable, Optional
+from typing import Dict, Generator, List, Any, Iterable, Optional, Tuple, TypeVar, Type
 
 logger = get_logger(__name__)
 
 client = os.getenv("CLIENT", "turboagency")
+
+T = TypeVar("T", bound=PaginatedResponse)
 
 
 class AMOClientData:
@@ -21,6 +29,7 @@ class AMOClientData:
         "pipelines": "/api/v4/leads/pipelines",
         "pipeline": "/api/v4/leads/pipelines/{id}",
     }
+    leads_with = []  # ["loss_reason", "contacts"]
 
 
 class AMOClientStatic:
@@ -124,48 +133,62 @@ class AMOClient(AMOClientData, AMOClientStatic):
     def __init__(self, url_prefix, long_token):
         self.url = "https://" + url_prefix + self.base_url
         self.token = long_token
+        self.headers = self._get_headers()
 
     def _get_headers(self) -> dict:
         headers = {"Authorization": "Bearer " + self.token, "Content-Type": "application/json"}
         return headers
 
+    def _set_with_params_for_query(self, with_params: list[str]) -> dict:
+        _dict = dict()
+        if with_params:
+            _dict["with"] = ",".join(param.strip() for param in with_params)
+        return _dict
+
+    def _get_default_with_param_for_leads(self) -> List:
+        return self.leads_with
+
+    async def _request_page(
+        self, url: str, session: ClientSession, params: dict = {}
+    ) -> Tuple[int, Optional[Dict[str, Any]]]:
+        max_retries = 5  # Макс кол-во попыток
+        for attempt in range(max_retries):
+            response = await session.get(url, params=params)
+            status, result = response.status, await response.read()
+            if status in (http.HTTPStatus.OK, http.HTTPStatus.CREATED):
+                return (status, json.loads(result))
+            elif status == http.HTTPStatus.TOO_MANY_REQUESTS:  # 429
+                wait_time = 1  # Время ожидания
+                logger.warning("Too many requests. Waiting for %d seconds before retrying...", wait_time)
+                await asyncio.sleep(wait_time)
+            elif status == http.HTTPStatus.FORBIDDEN:  # 403
+                logger.error("Access forbidden. Account may be blocked.")
+                return status, {}
+            else:
+                logger.warning("_request_get status = %s result = %s", status, result)
+                return status, {}
+
+        logger.error("Max retries exceeded for request")
+        return http.HTTPStatus.INTERNAL_SERVER_ERROR, {}
+
     async def _request_get(
-        self,
-        suffics_name,
-        id=None,
-        page: int = 1,
-        limit: int = 250,
-        filters: Optional[dict[str, int]] = None,
-        **kwargs,
-    ):
+        self, suffics_name, id=None, page: int = 1, limit: int = 250, filters: Optional[dict[str, int]] = None, **kwargs
+    ) -> Tuple[int, Optional[Dict[str, Any]]]:
         params = {"limit": limit, "page": page}
         if filters:
-            params.update(**self._create_filter_query(filters))
-        headers = self._get_headers()
-        with_params: list | None = kwargs.pop("with", None)
-        if with_params:
-            params["with"] = ",".join(param for param in with_params)
+            params.update(**self._filter_query(filters))
+
+        if with_params := kwargs.pop("with", None):
+            params.update(self._set_with_params_for_query(with_params))
         params.update(**kwargs)
-        async with ClientSession(headers=headers) as session:
+
+        async with ClientSession(headers=self.headers) as session:
             url = self.url + self.suffics[suffics_name]
             if id:
                 url += "/" + str(id)
-            # logger.info(f'url = {url}')
-            async with session.get(url=url, params=params) as response:
-                # logger.info(f'resp.status = {response.status}, headers = {response.headers}')
-                result = await response.read()
-                status = response.status
-            if status in (
-                http.HTTPStatus.OK,
-                http.HTTPStatus.CREATED,
-            ):
-                result = json.loads(result)
-            else:
-                logger.warning("_request_get status = %s result = %s", status, result)
-                result = {}
-        return status, result
+            return await self._request_page(url, session, params=params)
 
-    def _create_filter_query(self, filters: dict[str, int]) -> dict:
+    def _filter_query(self, filters: dict[str, int]) -> dict:
         filter_query = {}
         update_from = filters.pop("updated_at__from", None)
         update_to = filters.pop("updated_at__to", None)
@@ -188,23 +211,59 @@ class AMOClient(AMOClientData, AMOClientStatic):
         filter_query.update({f"filter[{k}]": v for k, v in filters.items()})
         return filter_query
 
-    async def get_leads_with_loss_reason(self, pipeline_id=None, filters: Optional[dict[str, int]] = None, **kwargs):
-        """Получить лиды со связанной причиной"""
-        with_params = kwargs.pop("with", [])
-        with_params.append("loss_reason")
-        kwargs["with"] = with_params
+    async def _fetch_all_pages(
+        self, cls: Type[T], suffics_name: str, filters: Optional[dict[str, int]] = None, **kwargs
+    ) -> List[Any]:
+        """Получить все страницы данных сущности."""
+        all_items = []
+        page = 1
+
+        status, response = await self._request_get(suffics_name=suffics_name, page=page, filters=filters, **kwargs)
+        first_page = cls(**response)
+        all_items.extend(first_page.get_items())
+        next_page = first_page.links.next.href if first_page.links.next else None
+
+        async with ClientSession(headers=self.headers) as session:
+            while next_page:
+                status, result = await self._request_page(next_page, session)
+
+                if status in (http.HTTPStatus.OK, http.HTTPStatus.CREATED):
+                    pag_response = cls(**result)
+                    all_items.extend(pag_response.get_items())
+
+                    if pag_response.links.next:
+                        next_page = pag_response.links.next.href
+                    else:
+                        break
+                else:
+                    logger.error("Failed to fetch data: status = %s, result = %s", status, result)
+                    break
+
+        return all_items
+
+    async def get_leads(self, pipeline_id=None, filters: Optional[dict[str, int]] = None, **kwargs) -> List[Lead]:
+        """Получить все лиды со связанной причиной"""
+        with_params = kwargs.get("with", [])
+        if len(with_params) == 0:
+            with_params += self._get_default_with_param_for_leads()
+            kwargs["with"] = with_params
         if pipeline_id:
             kwargs.update({"filter[pipeline_id]": pipeline_id})
         logger.debug("kwargs = %r", kwargs)
-        status, result = await self._request_get(suffics_name="leads", filters=filters, **kwargs)
-        logger.debug(f"status get_leads = {status}")
-        return result
 
-    async def get_pipelines(self, **kwargs):
-        status, result = await self._request_get(suffics_name="pipelines", **kwargs)
-        return result
+        return await self._fetch_all_pages(LeadResponse, suffics_name="leads", filters=filters, **kwargs)
 
-    async def get_contact_by_id(self, contact_id, **kwargs):
+    async def get_leads_with_params(
+        self, with_params: list[str] = None, pipeline_id=None, filters: Optional[dict[str, int]] = None, **kwargs
+    ) -> List[Lead]:
+        kwargs.update({"with": with_params})
+        return await self.get_leads(pipeline_id=pipeline_id, filters=filters, **kwargs)
+
+    async def get_pipelines(self, **kwargs) -> List[Pipeline]:
+        """Получить все воронки"""
+        return await self._fetch_all_pages(PipelinesResponse, suffics_name="pipelines", **kwargs)
+
+    async def get_contact_by_id(self, contact_id, **kwargs):  # TODO: сделать сущности
         status, result = await self._request_get(suffics_name=f"contacts", id=contact_id, **kwargs)
         return result
 
