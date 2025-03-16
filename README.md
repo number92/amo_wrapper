@@ -33,6 +33,8 @@ to_csv.add_lead_table_to_items(list_pipelines=pipelines, leads=leads)
 
 #### Запуск в docker
 
-sudo docker rm --env-file .env -f amocrm-stats && sudo docker rmi -f amocrm-stats
-sudo docker build -t amocrm-stats .
-sudo docker run --env-file .env -p 10111:10111 -d --name amocrm-stats amocrm-stats
+`sudo docker rm  -f amocrm-stats && sudo docker rmi -f amocrm-stats`  
+
+`sudo docker build -t amocrm-stats .`  
+
+`sudo docker run --env-file .env -p 10111:10111 -d --name amocrm-stats amocrm-stats`  

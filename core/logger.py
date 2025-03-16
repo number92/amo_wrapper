@@ -3,7 +3,7 @@ import logging
 import os
 from .config import BASE_DIR
 
-log_format = "%(levelname)s : %(asctime)s - %(module)s/%(funcName)s - %(message)s"
+log_format = "%(asctime)s | %(levelname)s | %(module)s/%(funcName)s - %(message)s"
 
 current_mounth = datetime.datetime.now().strftime("%Y-%m")
 

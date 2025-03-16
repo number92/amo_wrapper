@@ -11,6 +11,16 @@ AMO_PREFIX = "mitumoscow"
 AMO_LONG_TOKEN = os.getenv("AMO_LONG_TOKEN")
 DATE_TODAY = datetime.now().date().strftime("%d.%m.%Y")
 DATE_FROM = "01.01.2025"
+DEV_MODE = os.getenv("DEV_MODE", "false") == "true"
+API_KEY = os.getenv("API_KEY")
+
+
+CH_USER = os.getenv("CH_USER", "")
+CH_PASSWORD = os.getenv("CH_PASSWORD", "")
+CH_DB_NAME = os.getenv("CH_DB_NAME", "")
+CH_HOST = os.getenv("CH_HOST", "")
+
+# clickhouse<+driver>://<user>:<password>@<host>:<port>/<database>[?key=value..]
 
 ALIAS_MAPPING = {
     "ID": "id",
