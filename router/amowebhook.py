@@ -16,12 +16,21 @@ if not DEV_MODE:
 
 
 def decode_urlencoded(data: bytes) -> dict:
-    """Декодирует данные из формата application/x-www-form-urlencoded в словарь."""
+    """Декодирует данные из формата application/x-www-form-urlencoded в словарь с поддержкой вложенных структур."""
     decoded_data = data.decode()
     parsed_data = parse_qs(decoded_data)
 
-    # Преобразуем значения в parsed_data в нужный формат
-    return {key: value[0] for key, value in parsed_data.items()}
+    result = {}
+    for key, value in parsed_data.items():
+        keys = key.replace("]", "").split("[")
+        d = result
+        for k in keys[:-1]:
+            if k not in d:
+                d[k] = {}
+            d = d[k]
+        d[keys[-1]] = value[0]
+
+    return result
 
 
 @router.post("/newlead")
