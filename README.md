@@ -18,3 +18,10 @@ await amoclient.get_leads_with_loss_reason(filters=
     {"created_at__from": date_from, "created_at__to": date_to}
 )
 ```
+
+
+#### Запуск в docker
+
+sudo docker rm --env-file .env -f amocrm-stats && sudo docker rmi -f amocrm-stats
+sudo docker build -t amocrm-stats .
+sudo docker run --env-file .env -p 10111:10111 -d --name amocrm-stats amocrm-stats

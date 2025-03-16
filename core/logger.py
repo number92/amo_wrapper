@@ -5,21 +5,24 @@ from .config import BASE_DIR
 
 log_format = "%(levelname)s : %(asctime)s - %(module)s/%(funcName)s - %(message)s"
 
-current_date = datetime.datetime.now().strftime("%Y-%m-%d")
+current_mounth = datetime.datetime.now().strftime("%Y-%m")
 
 
-def get_logger(module, level=logging.INFO):
-    formatter = logging.Formatter(log_format)  # "%(asctime)s %(levelname)s %(message)s"
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-
-    file_handler = logging.FileHandler(os.path.join(BASE_DIR, "logs", f"{current_date}.log"))
-    file_handler.setFormatter(formatter)
+def get_logger(module=__name__, level=logging.INFO):
 
     custom_logger = logging.getLogger(module)
     custom_logger.setLevel(level)
 
-    custom_logger.addHandler(handler)
-    custom_logger.addHandler(file_handler)
+    if not custom_logger.handlers:
+
+        formatter = logging.Formatter(log_format)
+
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        custom_logger.addHandler(console_handler)
+
+        file_handler = logging.FileHandler(os.path.join(BASE_DIR, "logs", f"{current_mounth}.log"))
+        file_handler.setFormatter(formatter)
+        custom_logger.addHandler(file_handler)
 
     return custom_logger

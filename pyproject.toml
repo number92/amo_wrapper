@@ -3,12 +3,16 @@ name = "app"
 version = "0.1.0"
 description = ""
 authors = ["number92 <rav.92@list.ru>"]
-
+package-mode = false
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.12"
 python-dotenv = "^1.0.1"
 pydantic = "^2.10.6"
+pandas = "^2.2.3"
+fastapi = "^0.115.11"
+aiohttp = "^3.11.13"
+uvicorn = "^0.34.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^5.2"

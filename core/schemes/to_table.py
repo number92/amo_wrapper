@@ -73,6 +73,10 @@ class LeadToTable(AliasGenIgnoreFields):
 class ToCSV(IgnoreFieldModel):
     items: List[LeadToTable] | None = []
 
+    @property
+    def count_items(self):
+        return len(self.items)
+
     def add_lead_table_to_items(self, list_pipelines: List[Pipeline], leads: List[Lead]) -> List[LeadToTable]:
         """Добавляет в список обьекты модели"""
         pipelines = EmbeddedPipelines(pipelines=list_pipelines).get_pipelines()

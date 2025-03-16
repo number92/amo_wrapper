@@ -52,61 +52,6 @@ class AMOClientStatic:
         return result
 
     @staticmethod
-    def get_validated_contact(amo_contact: dict, lead: dict) -> dict:
-        contact = {}
-        contact["id"] = amo_contact["id"]
-        contact["amo_lead_id"] = lead["id"]
-        contact["first_name"] = amo_contact["first_name"]
-        contact["last_name"] = amo_contact["last_name"]
-        contact["name"] = amo_contact["name"]
-        contact["phone"] = None
-
-        params = {}
-        for cust_f in amo_contact["custom_fields_values"]:
-            if cust_f.get("field_code") == "PHONE":
-                contact["phone"] = AMOClientStatic.clear_phone_number(cust_f.get("values")[0]["value"])
-            else:
-                params[cust_f.get("field_name")] = cust_f.get("values")[0]["value"]
-
-        contact["params"] = params
-        return contact
-
-    @staticmethod
-    def extract__base_custom_fields(data: Dict[str, Any], fields: Iterable[str]) -> Dict[str, List[Any]]:
-        """Базовый метод кастомных полей"""
-        result = {}
-        custom_fields = data.get("custom_fields_values", [])
-        fields_set = set(fields)
-
-        for field in custom_fields:
-            field_name = field.get("field_name")
-
-            if field_name in fields_set:
-                result[field_name] = [item.get("value") for item in field.get("values", [])]
-
-        return result
-
-    # @staticmethod # TODO: сделать валидацию
-    # def get_validated_lead(lead: dict, reason: dict) -> dict:
-    #     lead = {}
-    #     lead["id"] = amo_contact["id"]
-    #     lead["amo_lead_id"] = lead["id"]
-    #     lead["first_name"] = amo_contact["first_name"]
-    #     lead["last_name"] = amo_contact["last_name"]
-    #     lead["name"] = amo_contact["name"]
-    #     lead["phone"] = None
-
-    #     params = {}
-    #     for cust_f in amo_contact["custom_fields_values"]:
-    #         if cust_f.get("field_code") == "PHONE":
-    #             contact["phone"] = AMOClientStatic.clear_phone_number(cust_f.get("values")[0]["value"])
-    #         else:
-    #             params[cust_f.get("field_name")] = cust_f.get("values")[0]["value"]
-
-    #     contact["params"] = params
-    #     return contact
-
-    @staticmethod
     def clear_phone_number(phone: str) -> str | None:
         if type(phone) is not str:
             return None

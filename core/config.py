@@ -9,7 +9,7 @@ load_dotenv()
 
 AMO_PREFIX = "mitumoscow"
 AMO_LONG_TOKEN = os.getenv("AMO_LONG_TOKEN")
-DATE_TO = datetime.now().date().strftime("%d.%m.%Y")  # Текущая дата
+DATE_TODAY = datetime.now().date().strftime("%d.%m.%Y")
 DATE_FROM = "01.01.2025"
 
 ALIAS_MAPPING = {
